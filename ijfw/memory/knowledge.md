@@ -115,3 +115,29 @@ PhotoMap SuggestWindow preview interactions (2026-10-31): enlarged preview adds 
 **Why:** User asked for keyboard-driven review flow inside trip suggestion preview.
 
 **How to apply:** Extend preview UX only inside SuggestWindow via _visible/_big/RefreshView; keep no-wrap arrow behavior.
+---
+type: decision
+summary: Other places: trip-window ±2d outside location zones
+stored: 2026-10-31T15:23:09.464Z
+hash: 6501e36b110a
+tags: [photomap, wpf, trip, other-section]
+---
+<!-- hash:6501e36b110a -->
+PhotoMap "Other places" section (2026-10-31): TripService.BuildOther(trip, catalog, tripFolder, copied, locations, radiusKm=1, days=2) — window = [min(trip TimeTicks)−2d, max(trip TimeTicks)+2d]; catalog photos with TimeTicks outside (or ==0, unknown date → excluded) are skipped; further excludes trip paths/names-in-trip-folder/session-copied; final filter NOT within 1 km of ANY location center; sorted chronologically. No date on ALL trip photos → empty section. SuggestWindow: ComboBox index _locations.Count = sentinel "★ Other places — trip period ±2 days (N photo(s))"; BuildGrid branches other-mode (source _others), _addedOther int counter mirrors _added dict for "+N newly added" (both label + LocInfo). Selection/copy flow identical (selection is global across sections; copied paths land in shared _copied set). MainWindow computes others after locs and passes as 3rd ctor arg (nullable).
+
+**Why:** User wanted en-route catalog photos from the trip period even when geographically detached from known stops.
+
+**How to apply:** Reuse BuildOther for any future date-window suggestions; section sentinel = index == _locations.Count in SuggestWindow.
+---
+type: decision
+summary: Bounded 4-worker FIFO thumb queue + loading estimations
+stored: 2026-10-31T15:30:25.009Z
+hash: a84eea6b128b
+tags: [photomap, wpf, thumbnails, queue, performance]
+---
+<!-- hash:a84eea6b128b -->
+PhotoMap thumbnail streaming fix (2026-10-31): root cause of empty tiles + slow loading = per-photo Task.Run flooding the thread pool with unbounded concurrent decodes (order arbitrary, cache misses thrash). Fix in ThumbnailService.LoadInto: bounded FIFO BlockingCollection + 4 LongRunning worker loops (EnsureWorkers via Interlocked one-shot), requests {Photo, Apply(Dispatcher), OnDone, Stale predicate}; stale check drops queued decodes cheaply (no decode) and still invokes OnDone so counters finish. SuggestWindow per-build LoadState{Total,Done} guarded by window _gridToken captured BEFORE _gridToken++ — CRITICAL ordering: increment token THEN create cards, pass tok to Card(p, tok, st); comparing st with _curLoad prevents old-build callbacks from polluting new counts. UI feedback: per-tile "loading…" TextBlock placeholder (behind Image in Grid), global indeterminate ProgressBar (LoadBar), status "Loading thumbnails… k/N (M remaining)" — suppressed while Enlarged preview open to not clobber its hint. MapControl grid thumbs also stream via the same pool now.
+
+**Why:** Large trip locations showed many empty tiles then slow random loads.
+
+**How to apply:** Tune Workers const in ThumbnailService; reuse load-state pattern (token+state object) for any future dynamic grids.

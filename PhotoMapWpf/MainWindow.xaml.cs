@@ -82,10 +82,11 @@ public partial class MainWindow : Window {
             var catalog = Map.Photos.ToList();
             _tripCopied.Clear();
             var locs = await Task.Run(() => TripService.Build(outcome.Photos, catalog, trip, _tripCopied));
-            int totalCands = locs.Sum(l => l.Candidates.Count);
+            var others = await Task.Run(() => TripService.BuildOther(outcome.Photos, catalog, trip, _tripCopied, locs));
+            int totalCands = locs.Sum(l => l.Candidates.Count) + others.Count;
             SetStatus($"{locs.Count} location(s) in trip folder, {totalCands:N0} catalog photo(s) nearby — pick and copy");
 
-            new SuggestWindow(trip, locs, _tripCopied) { Owner = this }.ShowDialog();
+            new SuggestWindow(trip, locs, others, _tripCopied) { Owner = this }.ShowDialog();
         } catch (Exception ex) {
             SetStatus("Error: " + ex.Message);
         } finally {

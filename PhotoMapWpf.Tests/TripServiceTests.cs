@@ -11,12 +11,13 @@ public class TripServiceTests : IDisposable {
     static readonly Photo C = P(0.0090);   // ~1.4 km north of A
     static readonly Photo far = P(2);
 
-    static Photo P(double lat, double lon = 0) {
+    static Photo P(double lat, double lon = 0, long? ticks = null) {
         return new Photo {
             Name = "p" + lat.ToString("G").Replace('.', '_') + ".jpg",
             Path = @"C:\x\" + lat + ".jpg",
             Lat = lat,
             Lon = lon,
+            TimeTicks = ticks ?? 0,
         };
     }
 
@@ -72,7 +73,37 @@ public class TripServiceTests : IDisposable {
         var copied = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { @"c:\catalog\copied.jpg" };
         var locs = TripService.Build(new List<Photo> { A }, catalog, _tripDir, copied);
 
-        var names = locs[0].Candidates.Select(p => p.Name).ToList();
+        var names = locs[0].Candidates.Select(n => n.Name).ToList();
         Assert.Equal(new[] { "fresh.jpg" }, names);
+    }
+
+    [Fact]
+    public void Other_sections_covers_trip_period_plus_two_days_outside_locations() {
+        long t0 = new DateTime(2026, 6, 10, 12, 0, 0).Ticks;
+        var hour = TimeSpan.FromHours(1).Ticks;
+        var trip = new List<Photo> { P(0, 0, t0), P(0.0045, 0, t0 + 8 * hour), P(0.0090, 0, t0 + 16 * hour) };
+
+        var inRangeFar = P(5.0, 0, t0 + 20 * hour);        // ~555 km away → fits
+        var outOfRange = P(5.5, 0, t0 + 4 * TimeSpan.FromDays(1).Ticks);  // >2 days after → out
+        var nearLoc = P(0.004, 0, t0 + 6 * hour);          // ~55 m from the location center → out
+        var tripCopy = new Photo { Name = "p0.jpg", Path = @"C:\x\0.jpg", Lat = 0, Lon = 0, TimeTicks = t0 + 2 * hour };
+
+        var locs = TripService.Build(trip, new List<Photo>(), _tripDir, new HashSet<string>());
+        var others = TripService.BuildOther(trip, new List<Photo> { inRangeFar, outOfRange, nearLoc, tripCopy },
+                                            _tripDir, new HashSet<string>(), locs);
+
+        Assert.Equal(new[] { inRangeFar }, others);
+        // window is exactly ±2 days around the trip's photo dates
+        var edge = P(9.0, 0, t0 - 2 * TimeSpan.FromDays(1).Ticks);
+        var justOutside = P(9.5, 0, t0 - 2 * TimeSpan.FromDays(1).Ticks - 1);
+        var others2 = TripService.BuildOther(trip, new List<Photo> { edge, justOutside }, _tripDir, null, locs);
+        Assert.Equal(new[] { edge }, others2);
+    }
+
+    [Fact]
+    public void Other_section_empty_without_trip_dates() {
+        var locs = TripService.Build(new List<Photo> { A }, new List<Photo>(), _tripDir, new HashSet<string>());
+        var others = TripService.BuildOther(new List<Photo> { A }, new List<Photo> { far }, _tripDir, null, locs);
+        Assert.Empty(others);
     }
 }

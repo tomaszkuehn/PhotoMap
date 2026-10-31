@@ -9,3 +9,5 @@
 - [2026-10-31T13:48:23.678Z] **decision** [photomap, wpf, chronology, edges, onrender]: Chronology lines: amber arrows older-&gt;newer between nearest clusters
 - [2026-10-31T14:45:58.095Z] **decision** [photomap, wpf, trip, clustering, suggestwindow]: Trip suggestions: 1km clustering + candidate window, copy back
 - [2026-10-31T14:58:14.785Z] **decision** [photomap, wpf, suggestwindow, preview, selection]: Suggest preview: S-select, arrows, added-marker on locations
+- [2026-10-31T15:23:09.463Z] **decision** [photomap, wpf, trip, other-section]: Other places: trip-window ±2d outside location zones
+- [2026-10-31T15:30:25.008Z] **decision** [photomap, wpf, thumbnails, queue, performance]: Bounded 4-worker FIFO thumb queue + loading estimations

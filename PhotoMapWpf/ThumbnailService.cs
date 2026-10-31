@@ -9,20 +9,60 @@ namespace PhotoMapWpf;
 
 public static class ThumbnailService {
     const int Thumb = 340;
+    const int Workers = 4;
 
     static readonly string CacheDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotoMap", "thumbs");
     static readonly ConcurrentDictionary<string, BitmapSource> Mem = new();
 
-    public static void LoadInto(Photo p, Image target) {
-        Task.Run(() => {
-            var src = GetThumb(p);
-            var app = Application.Current;
-            if (app == null) return;
-            app.Dispatcher.BeginInvoke(() => {
+    sealed class ThumbRequest {
+        public Photo Photo = null!;
+        public Action<BitmapSource?> Apply = null!;
+        public Action? OnDone;
+        public Func<bool>? Stale;
+    }
+
+    static readonly BlockingCollection<ThumbRequest> Work = new(new ConcurrentQueue<ThumbRequest>());
+    static int _workersStarted;
+
+    /// Queues one thumbnail; keeps a bounded worker pool so large grids stream in
+    /// steadily (FIFO = visual order) instead of flooding all cores at once.
+    public static void LoadInto(Photo p, Image target, Action? onDone = null, Func<bool>? stale = null) {
+        EnsureWorkers();
+        Work.Add(new ThumbRequest {
+            Photo = p,
+            Apply = src => {
                 if (ReferenceEquals(target.Tag, p) && src != null) target.Source = src;
-            });
+            },
+            OnDone = onDone,
+            Stale = stale,
         });
+    }
+
+    static void EnsureWorkers() {
+        if (Interlocked.CompareExchange(ref _workersStarted, 1, 0) != 0) return;
+        for (int i = 0; i < Workers; i++) {
+            _ = Task.Factory.StartNew(WorkerLoop, CancellationToken.None,
+                TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        }
+    }
+
+    static void WorkerLoop() {
+        foreach (var r in Work.GetConsumingEnumerable()) {
+            try {
+                bool skip = r.Stale != null && r.Stale();
+                var src = skip ? null : GetThumb(r.Photo);
+                var app = Application.Current;
+                void Finish() {
+                    if (!skip) r.Apply(src);
+                    r.OnDone?.Invoke();
+                }
+                if (app != null) app.Dispatcher.BeginInvoke(Finish);
+                else Finish();
+            } catch {
+                r.OnDone?.Invoke();
+            }
+        }
     }
 
     static BitmapSource? GetThumb(Photo p) {

@@ -36,7 +36,16 @@ A Tauri-based prototype (`src-tauri/`, `ui/`) was abandoned; the maintained appl
   **S** selects/deselects and **← / →** browse the location's photos (older → newer).
   Locations to which photos were copied get a **+N newly added** marker in the list.
   Each tile has a **select** checkbox, and **Copy selected (N)** copies the chosen photos
-  into the trip folder (same collision-safe naming as Export).
+  into   the trip folder (same collision-safe naming as Export).
+- **Other places section** — additionally to per-location suggestions, a **★ Other places**
+  entry lists catalog photos **captured within the trip period ± 2 days** that do **not**
+  fall within the 1 km zone of any trip location (e.g. shots taken en route); clicking it
+  shows them in the same thumbnail grid with the same select/copy flow. Photos without a
+  readable date are not placed in that window.
+- **Thumbnail streaming** — thumbnails decode through a bounded FIFO worker pool (4),
+  so large grids fill steadily in visual order; while loading, tiles show a `loading…`
+  placeholder, an indeterminate bar runs at the top and the status line reports the
+  estimate (`k/N loaded (M remaining)`). Switching locations drops stale decode requests.
 
 ## Build, test, run
 

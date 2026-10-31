@@ -11,6 +11,7 @@ public partial class SuggestWindow : Window {
 
     readonly string _tripFolder;
     readonly List<TripLocation> _locations;
+    readonly List<Photo> _others;
     readonly ISet<string> _copied;
     readonly HashSet<Photo> _selected = new();
     readonly List<Photo> _visible = new();
@@ -20,6 +21,15 @@ public partial class SuggestWindow : Window {
     TripLocation _cur = new();
     int _bigToken;
     Photo? _big;
+    readonly bool _hasOther;
+    int _addedOther;
+    int _gridToken;
+    LoadState? _curLoad;
+
+    sealed class LoadState {
+        public int Total;
+        public int Done;
+    }
 
     static readonly Brush BaseBorderBrush = Freeze(0x24, 0x2B, 0x34);
     static readonly Brush SelBorderBrush = Freeze(0x35, 0xC4, 0x6A);
@@ -33,15 +43,18 @@ public partial class SuggestWindow : Window {
         return brush;
     }
 
-    public SuggestWindow(string tripFolder, List<TripLocation> locations, ISet<string> copied) {
+    public SuggestWindow(string tripFolder, List<TripLocation> locations, List<Photo>? others, ISet<string> copied) {
         InitializeComponent();
         _tripFolder = tripFolder;
         _locations = locations;
         _copied = copied;
+        _others = others ?? new List<Photo>();
+        _hasOther = _others.Count > 0;
         Title = "Trip suggestions — copy catalog photos to " + tripFolder;
 
         LocBox.ItemsSource = LocationLabels();
         if (_locations.Count > 0) LocBox.SelectedIndex = 0;
+        else if (_hasOther) LocBox.SelectedIndex = _locations.Count;   // jump to the Other section
 
         Closing += (_, _) => _bigToken++;
     }
@@ -57,19 +70,25 @@ public partial class SuggestWindow : Window {
     }
 
     List<string> LocationLabels() {
-        return _locations
+        var labels = _locations
             .Select((l, i) => {
                 var s = $"Location {i + 1} — {l.Travel.Count} trip photo(s)" + DateSuffix(l);
                 if (_added.TryGetValue(l, out int n)) s += $"  ·  +{n} newly added";
                 return s;
             })
             .ToList();
+        if (_hasOther) {
+            var s = $"★ Other places — trip period ±2 days ({_others.Count} photo(s))";
+            if (_addedOther > 0) s += $"  ·  +{_addedOther} newly added";
+            labels.Add(s);
+        }
+        return labels;
     }
 
     void RefreshLabels() {
         int idx = LocBox.SelectedIndex;
         LocBox.ItemsSource = LocationLabels();
-        LocBox.SelectedIndex = idx >= 0 && idx < _locations.Count ? idx : -1;
+        LocBox.SelectedIndex = idx >= 0 && idx < _locations.Count + (_hasOther ? 1 : 0) ? idx : -1;
     }
 
     void OnLocChanged(object sender, SelectionChangedEventArgs e) {
@@ -78,28 +97,41 @@ public partial class SuggestWindow : Window {
 
     void BuildGrid() {
         int idx = LocBox.SelectedIndex;
-        if (idx < 0 || idx >= _locations.Count) return;
-        _cur = _locations[idx];
+        if (idx < 0 || idx >= _locations.Count + (_hasOther ? 1 : 0)) return;
+        bool other = idx >= _locations.Count;
+        _cur = other ? new TripLocation() : _locations[idx];
         _visible.Clear();
 
-        var cands = _cur.Candidates.Where(p => !_copied.Contains(p.Path)).ToList();
+        var source = other ? (IEnumerable<Photo>)_others
+                           : _locations[idx].Candidates;
+        var cands = source.Where(p => !_copied.Contains(p.Path)).ToList();
         Cards.Children.Clear();
         _cbs.Clear();
         _borders.Clear();
         _visible.Clear();
+        _gridToken++;
+        var st = new LoadState { Total = cands.Count };
+        _curLoad = st;
         foreach (var p in cands) {
-            Cards.Children.Add(Card(p));
+            Cards.Children.Add(Card(p, _gridToken, st));
             _visible.Add(p);
         }
+        UpdateLoadBar(st);
 
-        int added = _added.TryGetValue(_cur, out var a) ? a : 0;
-        LocInfo.Text = $"{_visible.Count} suggested · location center {_cur.Lat:F4}, {_cur.Lon:F4}"
-                     + (added > 0 ? $" · +{added} newly added" : "");
+        if (other) {
+            LocInfo.Text = $"{_visible.Count} suggested · captured within the trip period ±2 days, "
+                         + $"outside the 1 km zones of all locations"
+                         + (_addedOther > 0 ? $" · +{_addedOther} newly added" : "");
+        } else {
+            int added = _added.TryGetValue(_cur, out var a) ? a : 0;
+            LocInfo.Text = $"{_visible.Count} suggested · location center {_cur.Lat:F4}, {_cur.Lon:F4}"
+                         + (added > 0 ? $" · +{added} newly added" : "");
+        }
         EmptyHint.Visibility = _visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateCopyBtn();
     }
 
-    UIElement Card(Photo p) {
+    UIElement Card(Photo p, int tok, LoadState st) {
         var img = new Image {
             Width = 170,
             Height = 125,
@@ -107,7 +139,26 @@ public partial class SuggestWindow : Window {
             Tag = p,
             Cursor = Cursors.Hand,
         };
-        ThumbnailService.LoadInto(p, img);
+        var placeholder = new TextBlock {
+            Text = "loading…",
+            FontSize = 10,
+            Foreground = DimBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var imgBox = new Grid { Width = 170, Height = 125 };
+        imgBox.Children.Add(placeholder);
+        imgBox.Children.Add(img);
+
+        ThumbnailService.LoadInto(p, img,
+            onDone: () => {
+                placeholder.Visibility = Visibility.Collapsed;
+                st.Done++;
+                if (_curLoad == st && Enlarged.Visibility != Visibility.Visible) {
+                    UpdateLoadBar(st);
+                }
+            },
+            stale: () => _gridToken != tok);
 
         var name = new TextBlock {
             Text = p.Name,
@@ -132,7 +183,7 @@ public partial class SuggestWindow : Window {
         };
 
         var root = new StackPanel();
-        root.Children.Add(img);
+        root.Children.Add(imgBox);
         root.Children.Add(name);
         root.Children.Add(sub);
         root.Children.Add(cb);
@@ -259,6 +310,17 @@ public partial class SuggestWindow : Window {
         StatusT.Text = text;
     }
 
+    void UpdateLoadBar(LoadState st) {
+        int remaining = st.Total - st.Done;
+        bool loading = remaining > 0;
+        LoadBar.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        if (loading) {
+            SetStatus($"Loading thumbnails… {st.Done}/{st.Total} loaded ({remaining} remaining)");
+        } else if (st.Total > 0) {
+            SetStatus($"All {st.Total} thumbnails loaded — click a tile to enlarge, S = select");
+        }
+    }
+
     void UpdateCopyBtn() {
         CopyBtn.Content = $"Copy selected ({_selected.Count})";
         CopyBtn.IsEnabled = _selected.Count > 0;
@@ -288,6 +350,7 @@ public partial class SuggestWindow : Window {
                 int n = items.Count(i => l.Candidates.Contains(i));
                 if (n > 0) _added[l] = _added.TryGetValue(l, out var prev) ? prev + n : n;
             }
+            _addedOther += items.Count(i => _others.Contains(i));
             RefreshLabels();
             BuildGrid();
         } catch (Exception ex) {
