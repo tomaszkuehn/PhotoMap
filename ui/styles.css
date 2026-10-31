@@ -1,0 +1,81 @@
+:root{
+  --bg:#0e1116; --panel:#151a21; --text:#e8ecf1; --muted:#9aa7b4;
+  --accent:#2f7df6; --accent2:#57a0ff;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{
+  font:14px/1.45 "Segoe UI",system-ui,sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;
+  display:flex;flex-direction:column;
+}
+#topbar{
+  height:52px;flex:0 0 auto;display:flex;align-items:center;gap:12px;
+  padding:0 14px;background:var(--panel);border-bottom:1px solid #232b35;z-index:1200;
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.2px}
+.pin{
+  width:15px;height:15px;border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  background:radial-gradient(circle at 50% 38%, #fff 2.4px, transparent 3.1px), var(--accent);
+}
+.spacer{flex:1}
+#openBtn{
+  background:var(--accent);border:0;color:#fff;font:600 13.5px inherit;
+  padding:9px 15px;border-radius:8px;cursor:pointer;
+}
+#openBtn:hover{background:var(--accent2)}
+#openBtn:disabled{opacity:.5;cursor:default}
+#map{flex:1;min-height:0;background:#0b0e12}
+.leaflet-container{background:#0b0e12}
+.chip{
+  position:fixed;left:12px;bottom:12px;z-index:1100;
+  background:rgba(13,17,23,.88);border:1px solid #2a3440;color:var(--text);
+  padding:7px 12px;border-radius:8px;font-size:12.5px;pointer-events:none;
+  max-width:70vw;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;
+}
+
+/* cluster frames */
+.frame{
+  display:flex;align-items:center;justify-content:center;border-radius:12px;
+  background:rgba(47,125,246,.85);border:2px solid rgba(255,255,255,.95);
+  color:#fff;font-weight:700;box-shadow:0 3px 14px rgba(0,0,0,.45);
+  cursor:pointer;user-select:none;text-align:center;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.frame:hover{transform:scale(1.07);box-shadow:0 6px 20px rgba(0,0,0,.55)}
+.frame span{font-size:13.5px;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+
+/* single photo miniature */
+.thumb{
+  width:48px;height:48px;border-radius:9px;overflow:hidden;
+  border:2.5px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.5);
+  cursor:pointer;background:#222;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.thumb:hover{transform:scale(1.12);box-shadow:0 8px 22px rgba(0,0,0,.6)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* photo overlay over the map */
+#overlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center}
+#overlay[hidden]{display:none}
+.ov-back{position:absolute;inset:0;background:rgba(8,10,14,.78);backdrop-filter:blur(3px)}
+.ov-card{
+  position:relative;max-width:92vw;display:flex;flex-direction:column;
+  align-items:center;gap:10px;animation:pop .18s ease;
+}
+.ov-card img{
+  max-width:92vw;max-height:80vh;border-radius:14px;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);background:#0f1319;
+  opacity:0;transition:opacity .25s;
+}
+.ov-card img.ready{opacity:1}
+figcaption{text-align:center}
+#ov-name{font-size:14px;font-weight:600}
+#ov-meta{font-size:12px;color:var(--muted)}
+#ov-close{
+  position:absolute;top:-42px;right:-6px;width:32px;height:32px;border-radius:50%;
+  border:0;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer;
+}
+#ov-close:hover{background:rgba(255,255,255,.28)}
+@keyframes pop{from{transform:scale(.94);opacity:.4}to{transform:scale(1);opacity:1}}

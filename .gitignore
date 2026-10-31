@@ -1,0 +1,10 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/schemas/.lastcheck
+*.log
+PhotoMapWpf/bin/
+PhotoMapWpf/obj/
+PhotoMapWpf/publish/
+PhotoMapWpf.Tests/bin/
+PhotoMapWpf.Tests/obj/
+.ijfw/
