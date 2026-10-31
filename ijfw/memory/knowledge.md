@@ -89,3 +89,29 @@ PhotoMap WPF chronology lines (2026-10-31): EdgeLayer.cs = custom FrameworkEleme
 **Why:** OnRender-vs-Shape lesson and edge params must persist for tuning.
 
 **How to apply:** Tune edge behavior only via MapControl.RecalcEdges params (threshold 240px, radii, colors in EdgeLayer). Add any time-based logic on Photo.TimeTicks, never re-parse EXIF.
+---
+type: decision
+summary: Trip suggestions: 1km clustering + candidate window, copy back
+stored: 2026-10-31T14:45:58.095Z
+hash: 8df1ceb286db
+tags: [photomap, wpf, trip, clustering, suggestwindow]
+---
+<!-- hash:8df1ceb286db -->
+PhotoMap trip suggestions (2026-10-31): workflow = main catalog via "Open folder…" + TripBtn "Suggest…" → OpenFolderDialog pick TRIP folder → ScanService.Scan(trip) → TripService.Build(tripPhotos, catalog, tripFolder, copiedSet): greedy clustering — trip photo joins FIRST location whose mean center is within 1 km (center recomputed as running mean; chain clustering intentional) else new TripLocation; locations ordered chronologically by MeanTicks. Candidates = catalog photos within 1 km of center, EXCLUDING: photos with same path as trip photos, same NAME already anywhere in trip folder (recursive GetFiles check), and session-copied paths (HashSet&lt;string&gt; passed by reference from MainWindow._tripCopied, persists across SuggestWindow opens). SuggestWindow (modal, Owner=main): ComboBox location selector "(Location k — N trip photo(s) · date range)", WrapPanel cards 186px (Border bg #1A212A + Image 170x125 via ThumbnailService.LoadInto + name/sub + CheckBox select, green #35C46A 3px border when selected, border click → Enlarge via ThumbnailService.LoadPreviewAsync width=max(1200, ActualWidth*2), token pattern _bigToken, overlay Border RowSpan=3, click/Esc dismisses, Esc otherwise closes window). Copy = ExportService.Copy(selected, tripFolder) then copied.Add(path), _selected.Remove, BuildGrid. WPF gotchas: Color.FromHex does NOT exist (MAUI only) — use Color.FromRgb; Image has NO Background property (use wrapper Border for click area); HashSet&lt;Photo&gt;.Id equality trap — photos built in tests share Id="" so trip-exclusion compares Path not Id.
+
+**Why:** Feature per user: propose catalog photos per trip location, avoid repeated suggestions near close trip photos.
+
+**How to apply:** Extend only TripService.Build filters and SuggestWindow grid; keep 1 km radius constant (both clustering and candidates) unless user asks.
+---
+type: decision
+summary: Suggest preview: S-select, arrows, added-marker on locations
+stored: 2026-10-31T14:58:14.785Z
+hash: f545e505daab
+tags: [photomap, wpf, suggestwindow, preview, selection]
+---
+<!-- hash:f545e505daab -->
+PhotoMap SuggestWindow preview interactions (2026-10-31): enlarged preview adds S = toggle select + ←/→ browse within _visible (current location's filtered candidates, chronological order, no wrap — edge shows "first/last photo" status). Selection state single source = HashSet&lt;Photo&gt; _selected; UI refresh centralized in RefreshView(p) via _borders/_cbs dictionaries (cleared in BuildGrid, registered in Card) — checkbox Checked/Unchecked events and keyboard S both funnel through it (setting cb.IsChecked with same value fires no event). Location list = ComboBox ItemsSource List&lt;string&gt; rebuilt via LocationLabels()+RefreshLabels() preserving SelectedIndex; _added Dictionary&lt;TripLocation,int&gt; records copied counts ("+N newly added" suffix + LocInfo suffix) computed in OnCopyClick by counting items per location. Modal SuggestWindow keeps focus for PreviewKeyDown (Esc: enlarge→back, else Close).
+
+**Why:** User asked for keyboard-driven review flow inside trip suggestion preview.
+
+**How to apply:** Extend preview UX only inside SuggestWindow via _visible/_big/RefreshView; keep no-wrap arrow behavior.

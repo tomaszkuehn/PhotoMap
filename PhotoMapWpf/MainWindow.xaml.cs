@@ -49,11 +49,48 @@ public partial class MainWindow : Window {
         SelCount.Text = $"Selected: {n:N0}";
         ExportBtn.IsEnabled = n > 0 && !_exporting;
         ClearBtn.IsEnabled = n > 0 && !_exporting;
+        TripBtn.IsEnabled = Map.Photos.Count > 0 && !_exporting;
         UpdateLinesUi();
     }
 
     void OnClearSelectionClick(object sender, RoutedEventArgs e) {
         Map.ClearSelection();
+    }
+
+    // ---- trip suggestions --------------------------------------------------------
+
+    readonly HashSet<string> _tripCopied = new(StringComparer.OrdinalIgnoreCase);
+
+    async void OnTripSuggestClick(object sender, RoutedEventArgs e) {
+        var dlg = new Microsoft.Win32.OpenFolderDialog {
+            Title = "Select the TRIP folder (its photos define the locations)",
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        string trip = dlg.FolderName;
+
+        TripBtn.IsEnabled = false;
+        SetStatus($"Scanning trip folder {trip} …");
+        try {
+            var progress = new Progress<(int Scanned, int Mapped)>(v =>
+                SetStatus($"Scanning trip folder… {v.Scanned:N0} files checked, {v.Mapped:N0} geotagged"));
+            var outcome = await Task.Run(() => ScanService.Scan(trip, progress));
+            if (outcome.Photos.Count == 0) {
+                SetStatus("No geotagged photos found in the trip folder — nothing to suggest");
+                return;
+            }
+
+            var catalog = Map.Photos.ToList();
+            _tripCopied.Clear();
+            var locs = await Task.Run(() => TripService.Build(outcome.Photos, catalog, trip, _tripCopied));
+            int totalCands = locs.Sum(l => l.Candidates.Count);
+            SetStatus($"{locs.Count} location(s) in trip folder, {totalCands:N0} catalog photo(s) nearby — pick and copy");
+
+            new SuggestWindow(trip, locs, _tripCopied) { Owner = this }.ShowDialog();
+        } catch (Exception ex) {
+            SetStatus("Error: " + ex.Message);
+        } finally {
+            UpdateSelectionUi();
+        }
     }
 
     async void OnExportSelectedClick(object sender, RoutedEventArgs e) {

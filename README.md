@@ -26,6 +26,17 @@ A Tauri-based prototype (`src-tauri/`, `ui/`) was abandoned; the maintained appl
   files to a chosen folder (no overwrite; name collisions become `stem (k).ext`); selection
   survives the export. **S** in the overlay selects the current photo.
 - Scanning is recursive; photos without GPS are ignored.
+- **Trip suggestions** — with a catalog already opened, the **Suggest…** toolbar button lets
+  the user pick a *trip folder* (photos taken during the trip). The app clusters the trip
+  photos so those within **1 km** of each other form **one location**, then proposes for
+  every location the catalog photos located within the same 1 km radius (files already
+  present in the trip folder, trip photos themselves, and photos copied earlier this
+  session are never proposed again in that session). The suggestion window shows thumbnails;
+  clicking a tile enlarges the photo to window size (click again or **Esc** returns), where
+  **S** selects/deselects and **← / →** browse the location's photos (older → newer).
+  Locations to which photos were copied get a **+N newly added** marker in the list.
+  Each tile has a **select** checkbox, and **Copy selected (N)** copies the chosen photos
+  into the trip folder (same collision-safe naming as Export).
 
 ## Build, test, run
 

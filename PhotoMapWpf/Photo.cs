@@ -2,11 +2,14 @@ namespace PhotoMapWpf;
 
 public static class Geo {
     /// Great-circle distance in kilometers.
-    public static double HaversineKm(Photo a, Photo b) {
+    public static double HaversineKm(Photo a, Photo b) => Km(a.Lat, a.Lon, b.Lat, b.Lon);
+
+    /// Great-circle distance in kilometers for raw coordinates.
+    public static double Km(double lat1, double lon1, double lat2, double lon2) {
         const double R = 6_371_000;
-        double f1 = a.Lat * Math.PI / 180.0, f2 = b.Lat * Math.PI / 180.0;
+        double f1 = lat1 * Math.PI / 180.0, f2 = lat2 * Math.PI / 180.0;
         double df = f2 - f1;
-        double dl = (b.Lon - a.Lon) * Math.PI / 180.0;
+        double dl = (lon2 - lon1) * Math.PI / 180.0;
         double h = Math.Sin(df / 2) * Math.Sin(df / 2)
                  + Math.Cos(f1) * Math.Cos(f2) * Math.Sin(dl / 2) * Math.Sin(dl / 2);
         return 2 * R * Math.Asin(Math.Min(1.0, Math.Sqrt(h))) / 1000.0;
